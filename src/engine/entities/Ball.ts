@@ -40,7 +40,24 @@ export class Ball {
             this.vel = new Vector(0, 0);
         }
 
-        // BOUNDARY COLLISION - Bounce off pitch edges
+        // GOAL DETECTION (check before boundary collision so goals can be scored)
+        const goalTop = this.canvasHeight / 2 - 80;
+        const goalBottom = this.canvasHeight / 2 + 80;
+
+        if (this.pos.y > goalTop && this.pos.y < goalBottom) {
+            // Left goal (away team scores)
+            if (this.pos.x < 20) {
+                this.reset();
+                return { goalScored: true, scoredBy: 'away' };
+            }
+            // Right goal (home team scores)
+            if (this.pos.x > this.canvasWidth - 20) {
+                this.reset();
+                return { goalScored: true, scoredBy: 'home' };
+            }
+        }
+
+        // BOUNDARY COLLISION - Bounce off pitch edges (after goal detection)
         if (this.pos.x < 50 || this.pos.x > this.canvasWidth - 50) {
             this.vel.x *= -0.7;
             this.pos.x = Math.max(50, Math.min(this.canvasWidth - 50, this.pos.x));
@@ -49,23 +66,6 @@ export class Ball {
         if (this.pos.y < 50 || this.pos.y > this.canvasHeight - 50) {
             this.vel.y *= -0.7;
             this.pos.y = Math.max(50, Math.min(this.canvasHeight - 50, this.pos.y));
-        }
-
-        // GOAL DETECTION
-        const goalTop = this.canvasHeight / 2 - 80;
-        const goalBottom = this.canvasHeight / 2 + 80;
-
-        if (this.pos.y > goalTop && this.pos.y < goalBottom) {
-            // Left goal (away team scores)
-            if (this.pos.x < 30) {
-                this.reset();
-                return { goalScored: true, scoredBy: 'away' };
-            }
-            // Right goal (home team scores)
-            if (this.pos.x > this.canvasWidth - 30) {
-                this.reset();
-                return { goalScored: true, scoredBy: 'home' };
-            }
         }
 
         return { goalScored: false, scoredBy: null };

@@ -63,6 +63,7 @@ function App() {
   const difficultyOptions = ['easy', 'normal', 'hard', 'expert'] as const;
   const modeOptions = [
     { value: 'ai-vs-ai', label: 'CPU vs CPU' },
+    { value: 'human-vs-human', label: 'You vs You' },
     { value: 'human-vs-ai', label: 'You vs CPU' },
     { value: 'ai-vs-human', label: 'CPU vs You' },
   ] as const;
@@ -73,9 +74,9 @@ function App() {
       <div className="controls-section">
         <div className="control-group">
           <label htmlFor="game-mode">Game Mode:</label>
-          <select 
+          <select
             id="game-mode"
-            value={selectedMode} 
+            value={selectedMode}
             onChange={handleGameModeChange}
           >
             {modeOptions.map(mode => (
@@ -88,9 +89,9 @@ function App() {
 
         <div className="control-group">
           <label htmlFor="difficulty">Difficulty:</label>
-          <select 
+          <select
             id="difficulty"
-            value={selectedDifficulty} 
+            value={selectedDifficulty}
             onChange={handleDifficultyChange}
           >
             {difficultyOptions.map(difficulty => (
@@ -103,11 +104,11 @@ function App() {
       </div>
 
       <canvas id="pitch" ref={canvasRef}></canvas>
-      
+
       <div className="score" id="score">
         {gameState.score.home} - {gameState.score.away}
       </div>
-      
+
       <div className="game-info">
         <p>Mode: {getGameModeName(selectedMode as GameMode)}</p>
         <p>Difficulty: {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)}</p>

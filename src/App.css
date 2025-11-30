@@ -33,9 +33,9 @@ h1 {
 .control-group select {
   padding: 0.5rem 1rem;
   font-size: 1rem;
-  border: 2px solid #4444FF;
+  border: none;
   border-radius: 4px;
-  background-color: white;
+  background-color: #333333;
   cursor: pointer;
   transition: border-color 0.2s;
 }

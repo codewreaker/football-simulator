@@ -188,32 +188,88 @@ export class AIPlayerController implements IPlayerController {
         let targetPos = player.startPos;
         const distToBall = player.pos.dist(ball.pos);
         const distToStart = player.pos.dist(player.startPos);
+        const ballMoving = ball.vel.mag() >= 3 * (1 - this.difficultyConfig.reactionTime * 0.01);
 
-        if (
-            ball.vel.mag() <
-            3 * (1 - this.difficultyConfig.reactionTime * 0.01)
-        ) {
-            // Just move towards the ball if it's slow enough
-            if (distToBall < 250) {
-                targetPos = ball.pos;
-            } else if (distToStart > 150) {
+        // Only move aggressively towards ball if very close or it's a critical position
+        if (!ballMoving) {
+            // Ball is slow/stopped - position intelligently
+            if (player.role === 'defender') {
+                // Defenders stay near their own goal and between ball and goal
+                const ownGoalX = player.team === 'home' ? 100 : player.canvasWidth - 100;
+                const defenseLineX = player.team === 'home' ? 250 : player.canvasWidth - 250;
+                
+                // If ball is in own half, move towards it; otherwise stay in defense line
+                if ((player.team === 'home' && ball.pos.x < player.canvasWidth / 2) ||
+                    (player.team === 'away' && ball.pos.x > player.canvasWidth / 2)) {
+                    // Ball in own half - move towards it but not too far
+                    if (distToBall < 150) {
+                        targetPos = ball.pos;
+                    } else {
+                        // Position between ball and own goal
+                        const ballToGoalX = ownGoalX - ball.pos.x;
+                        targetPos = new Vector(
+                            ball.pos.x + ballToGoalX * 0.4,
+                            ball.pos.y
+                        );
+                    }
+                } else {
+                    // Ball in opponent's half - stay in defense line
+                    targetPos = new Vector(
+                        defenseLineX,
+                        player.startPos.y
+                    );
+                }
+            } else if (player.role === 'midfielder') {
+                // Midfielders provide support between defense and forwards
+                if (distToBall < 120) {
+                    targetPos = ball.pos;
+                } else {
+                    // Position in midfield offering support
+                    const supportDistance = 100;
+                    const supportX =
+                        player.team === 'home'
+                            ? Math.min(ball.pos.x - supportDistance, player.canvasWidth / 2 + 80)
+                            : Math.max(ball.pos.x + supportDistance, player.canvasWidth / 2 - 80);
+                    const spreadY = player.startPos.y + (ball.pos.y - player.startPos.y) * 0.3;
+                    targetPos = new Vector(supportX, spreadY);
+                }
+            } else {
+                // Forwards move towards ball and attack
+                if (distToBall < 100) {
+                    targetPos = ball.pos;
+                } else {
+                    // Position near ball for attacking opportunities
+                    const supportDistance = 60;
+                    const supportX =
+                        player.team === 'home'
+                            ? Math.max(ball.pos.x - supportDistance, player.canvasWidth / 2)
+                            : Math.min(ball.pos.x + supportDistance, player.canvasWidth / 2);
+                    const spreadY = player.startPos.y;
+                    targetPos = new Vector(supportX, spreadY);
+                }
+            }
+        } else {
+            // Ball is moving fast - maintain formation
+            if (distToStart > 200) {
                 targetPos = player.startPos;
             } else {
-                const supportDistance = 80;
-                const supportX =
-                    player.team === 'home'
-                        ? ball.pos.x - supportDistance
-                        : ball.pos.x + supportDistance;
-                const spreadY =
-                    ball.pos.y + (Math.random() - 0.5) * 120;
-                targetPos = new Vector(supportX, spreadY);
+                // Stay in position, track ball movement
+                const offset = new Vector(
+                    player.team === 'home' ? -80 : 80,
+                    (player.startPos.y - player.canvasHeight / 2) * 0.5
+                );
+                targetPos = ball.pos.add(offset);
+                
+                // Keep within reasonable bounds
+                targetPos.x = Math.max(100, Math.min(player.canvasWidth - 100, targetPos.x));
+                targetPos.y = Math.max(100, Math.min(player.canvasHeight - 100, targetPos.y));
             }
         }
 
         const desired = targetPos
             .sub(player.pos)
             .normalize()
-            .mult(player.maxSpeed);
+            .mult(player.maxSpeed * this.difficultyConfig.movementSpeed);
         const steer = desired.sub(player.vel).limit(0.4);
         player.acc = player.acc.add(steer);
     }
