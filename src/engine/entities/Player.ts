@@ -18,9 +18,17 @@ export class Player {
     radius: number;
     mass: number;
     maxSpeed: number;
+    sprintSpeed: number;
     acceleration: number;
     passTimer: number;
     possessionTime: number;
+
+    // Stamina system
+    stamina: number = 100;
+    maxStamina: number = 100;
+    staminaRecoveryRate: number = 8; // per second
+    staminaDrainRate: number = 20; // per second when sprinting
+    isSprinting: boolean = false;
 
     // Canvas dimensions for boundary checking and positioning (exposed for controllers)
     canvasWidth: number;
@@ -28,6 +36,10 @@ export class Player {
 
     // Player controller (AI or Human)
     private controller: IPlayerController | null = null;
+
+    // Ball possession tracking
+    hasPossession: boolean = false;
+    private possessionCooldown: number = 0;
 
     constructor(
         x: number,
@@ -46,6 +58,7 @@ export class Player {
         this.radius = 15;
         this.mass = 2;
         this.maxSpeed = this.getMaxSpeed();
+        this.sprintSpeed = this.maxSpeed * 1.6;
         this.acceleration = this.getAcceleration();
         this.passTimer = 0;
         this.possessionTime = 0;
@@ -59,15 +72,15 @@ export class Player {
     private getMaxSpeed(): number {
         switch (this.role) {
             case 'goalkeeper':
-                return 1.5;
+                return 100; // pixels per second
             case 'defender':
-                return 2.0;
+                return 130;
             case 'midfielder':
-                return 2.3;
+                return 150;
             case 'forward':
-                return 2.5;
+                return 160;
             default:
-                return 2.0;
+                return 130;
         }
     }
 
@@ -77,15 +90,15 @@ export class Player {
     private getAcceleration(): number {
         switch (this.role) {
             case 'goalkeeper':
-                return 0.25;
+                return 400; // pixels per second squared
             case 'defender':
-                return 0.35;
+                return 500;
             case 'midfielder':
-                return 0.4;
+                return 550;
             case 'forward':
-                return 0.45;
+                return 600;
             default:
-                return 0.3;
+                return 500;
         }
     }
 
@@ -97,37 +110,140 @@ export class Player {
     }
 
     /**
+     * Check if player has possession of the ball
+     */
+    updatePossession(ball: Ball, deltaTime: number): void {
+        const distToBall = this.pos.dist(ball.pos);
+        const possessionRadius = this.radius + ball.radius + 12;
+        
+        // Update cooldown
+        if (this.possessionCooldown > 0) {
+            this.possessionCooldown -= deltaTime;
+        }
+
+        // Check for possession (ball close and moving slowly relative to player)
+        if (distToBall < possessionRadius && ball.vel.mag() < 200 && this.possessionCooldown <= 0) {
+            this.hasPossession = true;
+            this.possessionTime += deltaTime;
+            
+            // Magnetize ball to player when in possession
+            const toBall = ball.pos.sub(this.pos);
+            if (toBall.mag() > this.radius + 8) {
+                const pullStrength = 300 * deltaTime;
+                ball.pos = ball.pos.add(toBall.normalize().mult(-pullStrength));
+            }
+        } else if (distToBall > possessionRadius + 10) {
+            if (this.hasPossession) {
+                this.possessionCooldown = 0.3; // 0.3 second cooldown after losing possession
+            }
+            this.hasPossession = false;
+            this.possessionTime = 0;
+        }
+    }
+
+    /**
+     * Set sprinting state
+     */
+    setSprinting(sprinting: boolean): void {
+        if (sprinting && this.stamina > 5) {
+            this.isSprinting = true;
+        } else {
+            this.isSprinting = false;
+        }
+    }
+
+    /**
+     * Update stamina based on sprint state
+     */
+    private updateStamina(deltaTime: number): void {
+        if (this.isSprinting && this.vel.mag() > 50) {
+            // Drain stamina when sprinting and actually moving
+            this.stamina = Math.max(0, this.stamina - this.staminaDrainRate * deltaTime);
+            if (this.stamina <= 0) {
+                this.isSprinting = false;
+            }
+        } else {
+            // Recover stamina when not sprinting
+            this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRecoveryRate * deltaTime);
+        }
+    }
+
+    /**
+     * Get current effective max speed (considering stamina and sprinting)
+     */
+    private getEffectiveMaxSpeed(): number {
+        if (this.isSprinting && this.stamina > 5) {
+            return this.sprintSpeed;
+        }
+        
+        // Reduce speed if stamina is very low
+        const staminaFactor = Math.max(0.7, this.stamina / this.maxStamina);
+        return this.maxSpeed * staminaFactor;
+    }
+
+    /**
      * Main update function called every frame
      */
-    update(ball: Ball, players: Player[]): void {
+    update(ball: Ball, players: Player[], deltaTime: number): void {
+        // Update possession status
+        this.updatePossession(ball, deltaTime);
+        
+        // Update stamina
+        this.updateStamina(deltaTime);
+
         // If a controller is set, use it for decision-making
         if (this.controller) {
             this.controller.update(this, ball, players);
             
             // Apply physics after controller has set acceleration
-            this.applyPhysics();
+            this.applyPhysics(deltaTime);
         } else {
             // Fallback to default AI behavior if no controller is set
-            this.defaultAIUpdate(ball, players);
+            this.defaultAIUpdate(ball, players, deltaTime);
         }
     }
 
     /**
      * Apply physics to the player (called by controllers)
      */
-    private applyPhysics(): void {
-        // Apply velocity and acceleration
-        this.vel = this.vel.add(this.acc).limit(this.maxSpeed);
-        this.pos = this.pos.add(this.vel);
+    private applyPhysics(deltaTime: number): void {
+        // Get effective max speed
+        const effectiveMaxSpeed = this.getEffectiveMaxSpeed();
+        
+        // Apply acceleration to velocity (physics formula: v = v + a*t)
+        this.vel = this.vel.add(this.acc.mult(deltaTime));
+        
+        // Limit velocity to max speed
+        this.vel = this.vel.limit(effectiveMaxSpeed);
+        
+        // Apply position change (physics formula: p = p + v*t)
+        this.pos = this.pos.add(this.vel.mult(deltaTime));
 
-        // Apply friction
-        this.vel = this.vel.mult(0.88);
-        this.acc = this.acc.mult(0);
+        // Apply friction/drag (exponential decay)
+        const frictionFactor = Math.pow(0.12, deltaTime); // 0.88 per frame at 60fps = 0.12 per second
+        this.vel = this.vel.mult(frictionFactor);
+        
+        // Reset acceleration for next frame
+        this.acc = new Vector(0, 0);
 
         // Keep player within pitch boundaries
         const padding = 55;
-        this.pos.x = Math.max(padding, Math.min(this.canvasWidth - padding, this.pos.x));
-        this.pos.y = Math.max(padding, Math.min(this.canvasHeight - padding, this.pos.y));
+        if (this.pos.x < padding) {
+            this.pos.x = padding;
+            this.vel.x = Math.abs(this.vel.x) * 0.3; // Bounce back slightly
+        }
+        if (this.pos.x > this.canvasWidth - padding) {
+            this.pos.x = this.canvasWidth - padding;
+            this.vel.x = -Math.abs(this.vel.x) * 0.3;
+        }
+        if (this.pos.y < padding) {
+            this.pos.y = padding;
+            this.vel.y = Math.abs(this.vel.y) * 0.3;
+        }
+        if (this.pos.y > this.canvasHeight - padding) {
+            this.pos.y = this.canvasHeight - padding;
+            this.vel.y = -Math.abs(this.vel.y) * 0.3;
+        }
 
         // GOALKEEPER SPECIFIC - Stay near goal
         if (this.role === 'goalkeeper') {
@@ -135,6 +251,7 @@ export class Player {
             const maxDistance = 100;
             if (Math.abs(this.pos.x - goalX) > maxDistance) {
                 this.pos.x = goalX + (this.pos.x > goalX ? maxDistance : -maxDistance);
+                this.vel.x *= 0.5;
             }
         }
     }
@@ -142,16 +259,12 @@ export class Player {
     /**
      * Default AI update behavior (preserved from original implementation)
      */
-    private defaultAIUpdate(ball: Ball, players: Player[]): void {
-        const distToBall = this.pos.dist(ball.pos);
-        const hasBall = distToBall < this.radius + ball.radius + 5 && ball.vel.mag() < 4;
-
-        if (hasBall) {
-            this.possessionTime++;
-            this.passTimer++;
+    private defaultAIUpdate(ball: Ball, players: Player[], deltaTime: number): void {        
+        if (this.hasPossession) {
+            this.passTimer += deltaTime;
 
             if (this.role === 'goalkeeper') {
-                if (this.passTimer > 20) {
+                if (this.passTimer > 1.0) {
                     this.pass(ball, players);
                     this.passTimer = 0;
                     this.possessionTime = 0;
@@ -159,7 +272,7 @@ export class Player {
                     this.holdBall(ball);
                 }
             } else {
-                if (this.passTimer > 40 && Math.random() < 0.15) {
+                if (this.passTimer > 2.0 && Math.random() < 0.15) {
                     this.pass(ball, players);
                     this.passTimer = 0;
                     this.possessionTime = 0;
@@ -173,33 +286,15 @@ export class Player {
         }
 
         // Apply physics
-        this.vel = this.vel.add(this.acc).limit(this.maxSpeed);
-        this.pos = this.pos.add(this.vel);
-
-        // Apply friction
-        this.vel = this.vel.mult(0.88);
-        this.acc = this.acc.mult(0);
-
-        // Keep player within pitch boundaries
-        const padding = 55;
-        this.pos.x = Math.max(padding, Math.min(this.canvasWidth - padding, this.pos.x));
-        this.pos.y = Math.max(padding, Math.min(this.canvasHeight - padding, this.pos.y));
-
-        // GOALKEEPER SPECIFIC - Stay near goal
-        if (this.role === 'goalkeeper') {
-            const goalX = this.team === 'home' ? 80 : this.canvasWidth - 80;
-            const maxDistance = 100;
-            if (Math.abs(this.pos.x - goalX) > maxDistance) {
-                this.pos.x = goalX + (this.pos.x > goalX ? maxDistance : -maxDistance);
-            }
-        }
+        this.applyPhysics(deltaTime);
     }
 
     /**
      * Hold ball stationary (used by goalkeeper)
      */
     private holdBall(ball: Ball): void {
-        ball.pos = this.pos.add(new Vector(this.team === 'home' ? 20 : -20, 0));
+        const offset = this.team === 'home' ? 20 : -20;
+        ball.pos = this.pos.add(new Vector(offset, 0));
         ball.vel = new Vector(0, 0);
     }
 
@@ -213,6 +308,7 @@ export class Player {
         const toGoal = new Vector(goalX - this.pos.x, goalY - this.pos.y).normalize();
         this.acc = this.acc.add(toGoal.mult(this.acceleration));
 
+        // Keep ball in front of player
         const ballOffset = toGoal.mult(this.radius + 10);
         ball.pos = this.pos.add(ballOffset);
         ball.vel = this.vel.mult(0.9);
@@ -235,8 +331,9 @@ export class Player {
             const target = passTargets[Math.floor(Math.random() * passTargets.length)];
             const toTarget = target.pos.sub(this.pos).normalize();
             const distance = this.pos.dist(target.pos);
-            const passPower = Math.min(12, 6 + distance * 0.015);
+            const passPower = Math.min(600, 300 + distance * 0.8);
             ball.vel = toTarget.mult(passPower);
+            this.hasPossession = false;
         }
     }
 
@@ -256,7 +353,7 @@ export class Player {
             const distToBall = this.pos.dist(ball.pos);
             const distToStart = this.pos.dist(this.startPos);
 
-            if (ball.vel.mag() < 3) {
+            if (ball.vel.mag() < 150) {
                 const closestTeammate = players
                     .filter((p) => p.team === this.team && p !== this && p.role !== 'goalkeeper')
                     .reduce(
@@ -297,15 +394,22 @@ export class Player {
             }
         }
 
-        const desired = targetPos.sub(this.pos).normalize().mult(this.maxSpeed);
-        const steer = desired.sub(this.vel).limit(0.4);
+        const desired = targetPos.sub(this.pos).normalize().mult(this.acceleration);
+        const steer = desired.sub(this.vel.mult(0.1)).limit(this.acceleration * 0.8);
         this.acc = this.acc.add(steer);
     }
 
     /**
      * Draw player on canvas
      */
-    draw(ctx: CanvasRenderingContext2D): void {
+    draw(ctx: CanvasRenderingContext2D, isSelected: boolean = false): void {
+        // Draw shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.arc(this.pos.x + 2, this.pos.y + 2, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw player body
         const color = this.team === 'home' ? '#FF4444' : '#4444FF';
 
         if (this.role === 'goalkeeper') {
@@ -321,9 +425,51 @@ export class Player {
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.beginPath();
-        ctx.arc(this.pos.x + 2, this.pos.y + 2, this.radius, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw selection indicator
+        if (isSelected) {
+            ctx.strokeStyle = '#FFFF00';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, this.radius + 5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Draw arrow above player
+            ctx.fillStyle = '#FFFF00';
+            ctx.beginPath();
+            ctx.moveTo(this.pos.x, this.pos.y - this.radius - 15);
+            ctx.lineTo(this.pos.x - 5, this.pos.y - this.radius - 8);
+            ctx.lineTo(this.pos.x + 5, this.pos.y - this.radius - 8);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Draw possession indicator
+        if (this.hasPossession) {
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, this.radius + 8, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Draw stamina bar (only for human-controlled players when selected)
+        if (isSelected && this.stamina < this.maxStamina) {
+            const barWidth = 30;
+            const barHeight = 4;
+            const barX = this.pos.x - barWidth / 2;
+            const barY = this.pos.y + this.radius + 12;
+
+            // Background
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            // Stamina level
+            const staminaPercent = this.stamina / this.maxStamina;
+            const staminaColor = staminaPercent > 0.5 ? '#00FF00' : staminaPercent > 0.25 ? '#FFAA00' : '#FF0000';
+            ctx.fillStyle = staminaColor;
+            ctx.fillRect(barX, barY, barWidth * staminaPercent, barHeight);
+        }
     }
 }

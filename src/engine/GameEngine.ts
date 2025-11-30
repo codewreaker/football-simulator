@@ -47,7 +47,18 @@ export class GameEngine {
     // Human player tracking
     private humanPlayers: Set<Player> = new Set();
     private humanPlayerControllers: Map<Player, HumanPlayerController> = new Map();
+    private selectedPlayer: Player | null = null;
     private pressedKeys: Set<string> = new Set();
+    
+    // Delta time for frame-independent movement
+    private lastFrameTime: number = 0;
+    private deltaTime: number = 0;
+    private targetFPS: number = 60;
+    private frameTime: number = 1000 / this.targetFPS;
+    
+    // Goal celebration pause
+    private goalCelebrationTime: number = 0;
+    private isGoalCelebrating: boolean = false;
     
     // Event listener references for cleanup
     private handleKeyDown: ((e: KeyboardEvent) => void) | null = null;
@@ -81,7 +92,14 @@ export class GameEngine {
      */
     private setupKeyboardInput(): void {
         this.handleKeyDown = (e: KeyboardEvent) => {
-            this.pressedKeys.add(e.key.toLowerCase());
+            const key = e.key.toLowerCase();
+            this.pressedKeys.add(key);
+            
+            // Handle player switching for human players
+            if ((key === 'q' || key === 'tab') && this.humanPlayers.size > 0) {
+                e.preventDefault();
+                this.switchPlayer();
+            }
         };
 
         this.handleKeyUp = (e: KeyboardEvent) => {
@@ -90,6 +108,28 @@ export class GameEngine {
 
         window.addEventListener('keydown', this.handleKeyDown);
         window.addEventListener('keyup', this.handleKeyUp);
+    }
+    
+    /**
+     * Switch to next human-controlled player
+     */
+    private switchPlayer(): void {
+        if (this.humanPlayers.size === 0) return;
+        
+        const humanPlayersArray = Array.from(this.humanPlayers);
+        
+        if (!this.selectedPlayer) {
+            this.selectedPlayer = humanPlayersArray[0];
+        } else {
+            const currentIndex = humanPlayersArray.indexOf(this.selectedPlayer);
+            const nextIndex = (currentIndex + 1) % humanPlayersArray.length;
+            this.selectedPlayer = humanPlayersArray[nextIndex];
+        }
+        
+        // Update all controllers to know which player is selected
+        this.humanPlayerControllers.forEach((controller, player) => {
+            controller.setSelected(player === this.selectedPlayer);
+        });
     }
     
     /**
@@ -170,6 +210,7 @@ export class GameEngine {
         const difficultyConfig = getDifficultyConfig(this.difficulty);
         this.humanPlayers.clear();
         this.humanPlayerControllers.clear();
+        this.selectedPlayer = null;
 
         const homeTeamPlayers = this.players.filter(p => p.team === 'home');
         const awayTeamPlayers = this.players.filter(p => p.team === 'away');
@@ -184,7 +225,7 @@ export class GameEngine {
                 break;
 
             case 'human-vs-ai':
-                // Human controls home team (except goalkeeper for simplicity)
+                // Human controls home team (except goalkeeper)
                 homeTeamPlayers.forEach((p, idx) => {
                     if (idx === 0) {
                         // Goalkeeper is AI
@@ -201,6 +242,11 @@ export class GameEngine {
                 awayTeamPlayers.forEach(p => {
                     p.setController(new AIPlayerController(difficultyConfig));
                 });
+                // Select first outfield player
+                if (this.humanPlayers.size > 0) {
+                    this.selectedPlayer = Array.from(this.humanPlayers)[0];
+                    this.humanPlayerControllers.get(this.selectedPlayer)?.setSelected(true);
+                }
                 break;
 
             case 'ai-vs-human':
@@ -221,10 +267,15 @@ export class GameEngine {
                         this.humanPlayerControllers.set(p, humanController);
                     }
                 });
+                // Select first outfield player
+                if (this.humanPlayers.size > 0) {
+                    this.selectedPlayer = Array.from(this.humanPlayers)[0];
+                    this.humanPlayerControllers.get(this.selectedPlayer)?.setSelected(true);
+                }
                 break;
 
             case 'human-vs-human':
-                // Split keyboard control: Home team on left side, Away on right
+                // Both teams controlled by humans (except goalkeepers)
                 homeTeamPlayers.forEach((p, idx) => {
                     if (idx === 0) {
                         p.setController(new AIPlayerController(difficultyConfig));
@@ -245,6 +296,11 @@ export class GameEngine {
                         this.humanPlayerControllers.set(p, humanController);
                     }
                 });
+                // Select first outfield player
+                if (this.humanPlayers.size > 0) {
+                    this.selectedPlayer = Array.from(this.humanPlayers)[0];
+                    this.humanPlayerControllers.get(this.selectedPlayer)?.setSelected(true);
+                }
                 break;
         }
     }
@@ -270,7 +326,8 @@ export class GameEngine {
         if (this.gameLoopId !== null) {
             return; // Already running
         }
-        this.gameLoopId = window.requestAnimationFrame(() => this.gameLoop());
+        this.lastFrameTime = performance.now();
+        this.gameLoopId = window.requestAnimationFrame((time) => this.gameLoop(time));
     }
 
     /**
@@ -288,6 +345,9 @@ export class GameEngine {
      */
     togglePause(): void {
         this.gameState.paused = !this.gameState.paused;
+        if (!this.gameState.paused) {
+            this.lastFrameTime = performance.now(); // Reset time to avoid large delta
+        }
         this.notifyStateChange();
     }
 
@@ -298,40 +358,57 @@ export class GameEngine {
         this.gameState.score = { home: 0, away: 0 };
         this.ball.reset();
         this.initializePlayers();
+        this.isGoalCelebrating = false;
+        this.goalCelebrationTime = 0;
         this.notifyStateChange();
     }
 
     /**
      * Main game loop - called every frame
      */
-    private gameLoop(): void {
+    private gameLoop(currentTime: number): void {
+        // Calculate delta time in seconds
+        this.deltaTime = Math.min((currentTime - this.lastFrameTime) / 1000, 0.1); // Cap at 0.1s to prevent huge jumps
+        this.lastFrameTime = currentTime;
+
         if (!this.gameState.paused) {
-            // Update keyboard input for human players
-            this.humanPlayerControllers.forEach((controller) => {
-                controller.handleInput(this.pressedKeys);
-            });
+            // Handle goal celebration pause
+            if (this.isGoalCelebrating) {
+                this.goalCelebrationTime += this.deltaTime;
+                if (this.goalCelebrationTime > 1.5) { // 1.5 second celebration
+                    this.isGoalCelebrating = false;
+                    this.goalCelebrationTime = 0;
+                    this.ball.reset();
+                }
+            } else {
+                // Update keyboard input for human players
+                this.humanPlayerControllers.forEach((controller) => {
+                    controller.handleInput(this.pressedKeys);
+                });
 
-            // Update game objects
-            const ballGoal = this.ball.update();
+                // Update game objects with delta time
+                const ballGoal = this.ball.update(this.deltaTime);
 
-            // Handle goal
-            if (ballGoal.goalScored && ballGoal.scoredBy) {
-                this.gameState.score[ballGoal.scoredBy]++;
-                this.notifyStateChange();
+                // Handle goal
+                if (ballGoal.goalScored && ballGoal.scoredBy) {
+                    this.gameState.score[ballGoal.scoredBy]++;
+                    this.isGoalCelebrating = true;
+                    this.notifyStateChange();
+                }
+
+                // Update players with delta time
+                this.players.forEach((p) => p.update(this.ball, this.players, this.deltaTime));
+
+                // Handle collisions
+                Physics.handleCollisions(this.players, this.ball);
             }
-
-            // Update players
-            this.players.forEach((p) => p.update(this.ball, this.players));
-
-            // Handle collisions
-            Physics.handleCollisions(this.players);
-
-            // Render frame
-            this.renderer.render(this.players, this.ball);
         }
 
+        // Render frame (always render, even when paused)
+        this.renderer.render(this.players, this.ball, this.selectedPlayer);
+
         // Continue game loop
-        this.gameLoopId = window.requestAnimationFrame(() => this.gameLoop());
+        this.gameLoopId = window.requestAnimationFrame((time) => this.gameLoop(time));
     }
 
     /**
