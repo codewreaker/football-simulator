@@ -1,24 +1,59 @@
-import { useEffect, useRef } from 'react'
-import engine, { } from './engine/engine'
-// import viteLogo from '/vite.svg'
+import { useEffect, useRef, useState } from 'react'
+import { GameEngine } from './engine/GameEngine'
+import type { GameState } from './engine/GameEngine'
 import './App.css'
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gameEngineRef = useRef<GameEngine | null>(null);
+  const [gameState, setGameState] = useState<GameState>({
+    score: { home: 0, away: 0 },
+    paused: false,
+  });
 
   useEffect(() => {
-    // Start the game!
-    engine(canvasRef.current)
-  }, [])
+    if (!canvasRef.current) return;
+
+    // Initialize game engine
+    const engine = new GameEngine(canvasRef.current);
+    gameEngineRef.current = engine;
+
+    // Register state change callback
+    engine.onStateChange((newState) => {
+      setGameState(newState);
+    });
+
+    // Start the game
+    engine.start();
+
+    // Cleanup on unmount
+    return () => {
+      engine.destroy();
+    };
+  }, []);
+
+  const handleResetGame = () => {
+    if (gameEngineRef.current) {
+      gameEngineRef.current.resetGame();
+    }
+  };
+
+  const handleTogglePause = () => {
+    if (gameEngineRef.current) {
+      gameEngineRef.current.togglePause();
+    }
+  };
 
   return (
     <>
       <h1>Football Sim</h1>
       <canvas id="pitch" ref={canvasRef}></canvas>
-      <div className="score" id="score">0 - 0</div>
+      <div className="score" id="score">{gameState.score.home} - {gameState.score.away}</div>
       <div className="controls">
-        <button onClick={() => (console.log('resetGame'))}>Reset Game</button>
-        <button onClick={() => (console.log('togglePause'))}>Pause/Resume</button>
+        <button onClick={handleResetGame}>Reset Game</button>
+        <button onClick={handleTogglePause}>
+          {gameState.paused ? 'Resume' : 'Pause'}
+        </button>
       </div>
     </>
   )
