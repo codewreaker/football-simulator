@@ -73,15 +73,6 @@ export class AIPlayerController implements IPlayerController {
         } else {
             this.positionOutfieldPlayer(player, ball);
         }
-
-        const desired = player.startPos
-            .sub(player.pos)
-            .normalize()
-            .mult(player.maxSpeed * this.difficultyConfig.movementSpeed);
-        const steer = desired
-            .sub(player.vel)
-            .limit(0.4);
-        player.acc = player.acc.add(steer);
     }
 
     private dribble(player: Player, ball: Ball): void {

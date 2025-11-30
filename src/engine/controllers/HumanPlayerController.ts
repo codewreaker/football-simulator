@@ -16,16 +16,16 @@ export class HumanPlayerController implements IPlayerController {
         // Get player input
         const moveVector = new Vector(0, 0);
 
-        if (this.pressedKeys.has('ArrowUp') || this.pressedKeys.has('w')) {
+        if (this.pressedKeys.has('arrowup') || this.pressedKeys.has('w')) {
             moveVector.y -= 1;
         }
-        if (this.pressedKeys.has('ArrowDown') || this.pressedKeys.has('s')) {
+        if (this.pressedKeys.has('arrowdown') || this.pressedKeys.has('s')) {
             moveVector.y += 1;
         }
-        if (this.pressedKeys.has('ArrowLeft') || this.pressedKeys.has('a')) {
+        if (this.pressedKeys.has('arrowleft') || this.pressedKeys.has('a')) {
             moveVector.x -= 1;
         }
-        if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('d')) {
+        if (this.pressedKeys.has('arrowright') || this.pressedKeys.has('d')) {
             moveVector.x += 1;
         }
 

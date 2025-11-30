@@ -48,6 +48,10 @@ export class GameEngine {
     private humanPlayers: Set<Player> = new Set();
     private humanPlayerControllers: Map<Player, HumanPlayerController> = new Map();
     private pressedKeys: Set<string> = new Set();
+    
+    // Event listener references for cleanup
+    private handleKeyDown: ((e: KeyboardEvent) => void) | null = null;
+    private handleKeyUp: ((e: KeyboardEvent) => void) | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -76,16 +80,30 @@ export class GameEngine {
      * Setup keyboard input handling
      */
     private setupKeyboardInput(): void {
-        const handleKeyDown = (e: KeyboardEvent) => {
+        this.handleKeyDown = (e: KeyboardEvent) => {
             this.pressedKeys.add(e.key.toLowerCase());
         };
 
-        const handleKeyUp = (e: KeyboardEvent) => {
+        this.handleKeyUp = (e: KeyboardEvent) => {
             this.pressedKeys.delete(e.key.toLowerCase());
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('keydown', this.handleKeyDown);
+        window.addEventListener('keyup', this.handleKeyUp);
+    }
+    
+    /**
+     * Remove keyboard event listeners (cleanup)
+     */
+    private removeKeyboardInput(): void {
+        if (this.handleKeyDown) {
+            window.removeEventListener('keydown', this.handleKeyDown);
+        }
+        if (this.handleKeyUp) {
+            window.removeEventListener('keyup', this.handleKeyUp);
+        }
+        this.handleKeyDown = null;
+        this.handleKeyUp = null;
     }
 
     /**
@@ -330,5 +348,6 @@ export class GameEngine {
      */
     destroy(): void {
         this.stop();
+        this.removeKeyboardInput();
     }
 }
