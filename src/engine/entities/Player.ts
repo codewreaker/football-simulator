@@ -1,5 +1,6 @@
 import { Vector } from '../math/Vector';
 import { Ball } from './Ball';
+import type { IPlayerController } from '../controllers/IPlayerController';
 
 export type PlayerRole = 'goalkeeper' | 'defender' | 'midfielder' | 'forward';
 export type Team = 'home' | 'away';
@@ -21,9 +22,12 @@ export class Player {
     passTimer: number;
     possessionTime: number;
 
-    // Canvas dimensions for boundary checking and positioning
-    private canvasWidth: number;
-    private canvasHeight: number;
+    // Canvas dimensions for boundary checking and positioning (exposed for controllers)
+    canvasWidth: number;
+    canvasHeight: number;
+
+    // Player controller (AI or Human)
+    private controller: IPlayerController | null = null;
 
     constructor(
         x: number,
@@ -86,9 +90,29 @@ export class Player {
     }
 
     /**
+     * Set the player controller (AI or Human)
+     */
+    setController(controller: IPlayerController): void {
+        this.controller = controller;
+    }
+
+    /**
      * Main update function called every frame
      */
     update(ball: Ball, players: Player[]): void {
+        // If a controller is set, use it for decision-making
+        if (this.controller) {
+            this.controller.update(this, ball, players);
+        } else {
+            // Fallback to default AI behavior if no controller is set
+            this.defaultAIUpdate(ball, players);
+        }
+    }
+
+    /**
+     * Default AI update behavior (preserved from original implementation)
+     */
+    private defaultAIUpdate(ball: Ball, players: Player[]): void {
         const distToBall = this.pos.dist(ball.pos);
         const hasBall = distToBall < this.radius + ball.radius + 5 && ball.vel.mag() < 4;
 

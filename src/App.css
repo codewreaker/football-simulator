@@ -1,7 +1,128 @@
 #root {
-  max-width: 1280px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
 }
 
+h1 {
+  color: #333;
+  margin-bottom: 1.5rem;
+  font-size: 2.5rem;
+}
+
+.controls-section {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.control-group label {
+  font-weight: 600;
+  color: #333;
+}
+
+.control-group select {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #4444FF;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.control-group select:hover:not(:disabled) {
+  border-color: #FF4444;
+}
+
+.control-group select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+canvas {
+  border: 3px solid #333;
+  display: block;
+  margin: 1.5rem auto;
+  max-width: 100%;
+  height: auto;
+  background-color: #2d7a2d;
+}
+
+.score {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333;
+  margin: 1rem 0;
+  font-family: 'Courier New', monospace;
+}
+
+.game-info {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 1rem 0;
+}
+
+.game-info p {
+  margin: 0.25rem 0;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 1.5rem 0;
+  flex-wrap: wrap;
+}
+
+.controls button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  background-color: #4444FF;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.controls button:hover {
+  background-color: #3333DD;
+  transform: translateY(-2px);
+}
+
+.controls button:active {
+  transform: translateY(0);
+}
+
+.instructions {
+  background-color: #f5f5f5;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-top: 2rem;
+  text-align: left;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.instructions h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.instructions p {
+  margin: 0.5rem 0;
+  color: #666;
+  font-family: 'Courier New', monospace;
+}

@@ -2,6 +2,11 @@ import { Ball } from './entities/Ball';
 import { Player } from './entities/Player';
 import { Renderer } from './renderer/Renderer';
 import { Physics } from './physics/Physics';
+import { AIPlayerController } from './controllers/AIPlayerController';
+import { HumanPlayerController } from './controllers/HumanPlayerController';
+import type { GameMode } from './modes/GameMode';
+import type { GameDifficulty } from './difficulty/DifficultyConfig';
+import { getDifficultyConfig } from './difficulty/DifficultyConfig';
 
 export interface GameState {
     score: {
@@ -9,6 +14,8 @@ export interface GameState {
         away: number;
     };
     paused: boolean;
+    gameMode?: GameMode;
+    difficulty?: GameDifficulty;
 }
 
 /**
@@ -32,6 +39,15 @@ export class GameEngine {
 
     private gameLoopId: number | null = null;
     private stateChangeCallback: ((state: GameState) => void) | null = null;
+    
+    // Game mode and difficulty settings
+    private gameMode: GameMode = 'ai-vs-ai';
+    private difficulty: GameDifficulty = 'normal';
+    
+    // Human player tracking
+    private humanPlayers: Set<Player> = new Set();
+    private humanPlayerControllers: Map<Player, HumanPlayerController> = new Map();
+    private pressedKeys: Set<string> = new Set();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -51,6 +67,34 @@ export class GameEngine {
 
         // Initialize players
         this.initializePlayers();
+        
+        // Setup keyboard input
+        this.setupKeyboardInput();
+    }
+
+    /**
+     * Setup keyboard input handling
+     */
+    private setupKeyboardInput(): void {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            this.pressedKeys.add(e.key.toLowerCase());
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            this.pressedKeys.delete(e.key.toLowerCase());
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+    }
+
+    /**
+     * Set game mode and difficulty
+     */
+    setGameMode(gameMode: GameMode, difficulty: GameDifficulty = 'normal'): void {
+        this.gameMode = gameMode;
+        this.difficulty = difficulty;
+        this.resetGame();
     }
 
     /**
@@ -96,6 +140,95 @@ export class GameEngine {
             new Player(350, this.canvasHeight / 2, 'away', 'forward', this.canvasWidth, this.canvasHeight),
             new Player(350, this.canvasHeight / 2 + 80, 'away', 'forward', this.canvasWidth, this.canvasHeight),
         ];
+
+        // Setup controllers based on game mode
+        this.setupControllers();
+    }
+
+    /**
+     * Setup player controllers based on game mode
+     */
+    private setupControllers(): void {
+        const difficultyConfig = getDifficultyConfig(this.difficulty);
+        this.humanPlayers.clear();
+        this.humanPlayerControllers.clear();
+
+        const homeTeamPlayers = this.players.filter(p => p.team === 'home');
+        const awayTeamPlayers = this.players.filter(p => p.team === 'away');
+
+        switch (this.gameMode) {
+            case 'ai-vs-ai':
+            case 'cpu-vs-cpu':
+                // All AI
+                this.players.forEach(p => {
+                    p.setController(new AIPlayerController(difficultyConfig));
+                });
+                break;
+
+            case 'human-vs-ai':
+                // Human controls home team (except goalkeeper for simplicity)
+                homeTeamPlayers.forEach((p, idx) => {
+                    if (idx === 0) {
+                        // Goalkeeper is AI
+                        p.setController(new AIPlayerController(difficultyConfig));
+                    } else {
+                        // Outfield players controlled by human
+                        const humanController = new HumanPlayerController();
+                        p.setController(humanController);
+                        this.humanPlayers.add(p);
+                        this.humanPlayerControllers.set(p, humanController);
+                    }
+                });
+                // Away team is AI
+                awayTeamPlayers.forEach(p => {
+                    p.setController(new AIPlayerController(difficultyConfig));
+                });
+                break;
+
+            case 'ai-vs-human':
+                // Home team is AI
+                homeTeamPlayers.forEach(p => {
+                    p.setController(new AIPlayerController(difficultyConfig));
+                });
+                // Human controls away team (except goalkeeper)
+                awayTeamPlayers.forEach((p, idx) => {
+                    if (idx === 0) {
+                        // Goalkeeper is AI
+                        p.setController(new AIPlayerController(difficultyConfig));
+                    } else {
+                        // Outfield players controlled by human
+                        const humanController = new HumanPlayerController();
+                        p.setController(humanController);
+                        this.humanPlayers.add(p);
+                        this.humanPlayerControllers.set(p, humanController);
+                    }
+                });
+                break;
+
+            case 'human-vs-human':
+                // Split keyboard control: Home team on left side, Away on right
+                homeTeamPlayers.forEach((p, idx) => {
+                    if (idx === 0) {
+                        p.setController(new AIPlayerController(difficultyConfig));
+                    } else {
+                        const humanController = new HumanPlayerController();
+                        p.setController(humanController);
+                        this.humanPlayers.add(p);
+                        this.humanPlayerControllers.set(p, humanController);
+                    }
+                });
+                awayTeamPlayers.forEach((p, idx) => {
+                    if (idx === 0) {
+                        p.setController(new AIPlayerController(difficultyConfig));
+                    } else {
+                        const humanController = new HumanPlayerController();
+                        p.setController(humanController);
+                        this.humanPlayers.add(p);
+                        this.humanPlayerControllers.set(p, humanController);
+                    }
+                });
+                break;
+        }
     }
 
     /**
@@ -155,6 +288,11 @@ export class GameEngine {
      */
     private gameLoop(): void {
         if (!this.gameState.paused) {
+            // Update keyboard input for human players
+            this.humanPlayerControllers.forEach((controller) => {
+                controller.handleInput(this.pressedKeys);
+            });
+
             // Update game objects
             const ballGoal = this.ball.update();
 
