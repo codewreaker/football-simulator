@@ -103,9 +103,39 @@ export class Player {
         // If a controller is set, use it for decision-making
         if (this.controller) {
             this.controller.update(this, ball, players);
+            
+            // Apply physics after controller has set acceleration
+            this.applyPhysics();
         } else {
             // Fallback to default AI behavior if no controller is set
             this.defaultAIUpdate(ball, players);
+        }
+    }
+
+    /**
+     * Apply physics to the player (called by controllers)
+     */
+    private applyPhysics(): void {
+        // Apply velocity and acceleration
+        this.vel = this.vel.add(this.acc).limit(this.maxSpeed);
+        this.pos = this.pos.add(this.vel);
+
+        // Apply friction
+        this.vel = this.vel.mult(0.88);
+        this.acc = this.acc.mult(0);
+
+        // Keep player within pitch boundaries
+        const padding = 55;
+        this.pos.x = Math.max(padding, Math.min(this.canvasWidth - padding, this.pos.x));
+        this.pos.y = Math.max(padding, Math.min(this.canvasHeight - padding, this.pos.y));
+
+        // GOALKEEPER SPECIFIC - Stay near goal
+        if (this.role === 'goalkeeper') {
+            const goalX = this.team === 'home' ? 80 : this.canvasWidth - 80;
+            const maxDistance = 100;
+            if (Math.abs(this.pos.x - goalX) > maxDistance) {
+                this.pos.x = goalX + (this.pos.x > goalX ? maxDistance : -maxDistance);
+            }
         }
     }
 

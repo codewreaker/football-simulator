@@ -41,7 +41,7 @@ export class HumanPlayerController implements IPlayerController {
         this.lastPassTime++;
         if (
             (this.pressedKeys.has(' ') ||
-                this.pressedKeys.has('Enter')) &&
+                this.pressedKeys.has('enter')) &&
             this.lastPassTime > this.passDelay
         ) {
             const distToBall = player.pos.dist(ball.pos);
@@ -55,25 +55,6 @@ export class HumanPlayerController implements IPlayerController {
                 this.lastPassTime = 0;
             }
         }
-
-        // Apply physics
-        player.vel = player.vel.add(player.acc).limit(player.maxSpeed);
-        player.pos = player.pos.add(player.vel);
-
-        // Apply friction
-        player.vel = player.vel.mult(0.88);
-        player.acc = player.acc.mult(0);
-
-        // Keep player within pitch boundaries
-        const padding = 55;
-        player.pos.x = Math.max(
-            padding,
-            Math.min(player.canvasWidth - padding, player.pos.x)
-        );
-        player.pos.y = Math.max(
-            padding,
-            Math.min(player.canvasHeight - padding, player.pos.y)
-        );
 
         // Ball follows human player when they're close
         const distToBall = player.pos.dist(ball.pos);

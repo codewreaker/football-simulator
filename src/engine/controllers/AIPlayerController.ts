@@ -27,36 +27,6 @@ export class AIPlayerController implements IPlayerController {
         } else {
             this.handleOffBall(player, ball);
         }
-
-        // Apply physics
-        player.vel = player.vel.add(player.acc).limit(player.maxSpeed);
-        player.pos = player.pos.add(player.vel);
-
-        // Apply friction
-        player.vel = player.vel.mult(0.88);
-        player.acc = player.acc.mult(0);
-
-        // Keep player within pitch boundaries
-        const padding = 55;
-        player.pos.x = Math.max(
-            padding,
-            Math.min(player.canvasWidth - padding, player.pos.x)
-        );
-        player.pos.y = Math.max(
-            padding,
-            Math.min(player.canvasHeight - padding, player.pos.y)
-        );
-
-        // GOALKEEPER SPECIFIC - Stay near goal
-        if (player.role === 'goalkeeper') {
-            const goalX = player.team === 'home' ? 80 : player.canvasWidth - 80;
-            const maxDistance = 100;
-            if (Math.abs(player.pos.x - goalX) > maxDistance) {
-                player.pos.x =
-                    goalX +
-                    (player.pos.x > goalX ? maxDistance : -maxDistance);
-            }
-        }
     }
 
     private handlePossession(
