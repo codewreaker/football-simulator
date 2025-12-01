@@ -186,7 +186,7 @@ export class HumanPlayerController implements IPlayerController {
     /**
      * Pass to teammate or in direction of movement
      */
-    private pass(player: Player, ball: Ball, players: Player[], chargePercent: number): void {
+    private pass(player: Player, ball: Ball, _players: Player[], chargePercent: number): void {
         // Determine pass direction
         let passDirection = new Vector(0, 0);
 

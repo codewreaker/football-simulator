@@ -549,7 +549,7 @@ export class AIPlayerController implements IPlayerController {
         const cornerOffset = (Math.random() - 0.5) * 120;
         const targetY = goalY + cornerOffset;
 
-        let toGoal = new Vector(goalX - player.pos.x, targetY - player.pos.y).normalize();
+        const toGoal = new Vector(goalX - player.pos.x, targetY - player.pos.y).normalize();
 
         // Add shooting error based on difficulty
         const shootingError = (1 - this.difficultyConfig.shootingConfidence) * 0.3;

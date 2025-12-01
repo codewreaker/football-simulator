@@ -104,7 +104,7 @@ export class Renderer {
     /**
      * Draw goal with netting effect
      */
-    private drawGoal(x: number, y: number, width: number, height: number, side: 'left' | 'right'): void {
+    private drawGoal(x: number, y: number, width: number, height: number, _side: 'left' | 'right'): void {
         // Goal frame
         this.ctx.strokeStyle = 'white';
         this.ctx.lineWidth = 2;
