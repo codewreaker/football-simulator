@@ -15,3 +15,16 @@ export type { PlayerRole, Team } from './entities/Player';
 export { Vector } from './math/Vector';
 export { Renderer } from './renderer/Renderer';
 export { Physics } from './physics/Physics';
+
+// Export controllers
+export { AIPlayerController } from './controllers/AIPlayerController';
+export { HumanPlayerController } from './controllers/HumanPlayerController';
+export type { IPlayerController } from './controllers/IPlayerController';
+
+// Export difficulty system
+export { GameDifficulty, getDifficultyConfig } from './difficulty/DifficultyConfig';
+export type { DifficultyConfig } from './difficulty/DifficultyConfig';
+
+// Export game modes
+export { GameMode, getGameModeName } from './modes/GameMode';
+export type { GameMode as GameModeType } from './modes/GameMode';
