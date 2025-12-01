@@ -73,11 +73,11 @@ export class Renderer {
         // PENALTY ARCS
         this.ctx.strokeStyle = 'white';
         this.ctx.beginPath();
-        this.ctx.arc(170, this.canvasHeight / 2, 70, -Math.PI / 2.5, Math.PI / 2.5);
+        this.ctx.arc(160, this.canvasHeight / 2, 70, -Math.PI / 2.5, Math.PI / 2.5);
         this.ctx.stroke();
         this.ctx.beginPath();
         this.ctx.arc(
-            this.canvasWidth - 170,
+            this.canvasWidth - 160,
             this.canvasHeight / 2,
             70,
             Math.PI - Math.PI / 2.5,
