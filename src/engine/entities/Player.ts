@@ -114,27 +114,22 @@ export class Player {
      */
     updatePossession(ball: Ball, deltaTime: number): void {
         const distToBall = this.pos.dist(ball.pos);
-        const possessionRadius = this.radius + ball.radius + 12;
+        const possessionRadius = this.radius + ball.radius + 15;
         
         // Update cooldown
         if (this.possessionCooldown > 0) {
             this.possessionCooldown -= deltaTime;
         }
 
-        // Check for possession (ball close and moving slowly relative to player)
-        if (distToBall < possessionRadius && ball.vel.mag() < 200 && this.possessionCooldown <= 0) {
+        // Check for possession (ball close and moving slowly)
+        if (distToBall < possessionRadius && ball.vel.mag() < 250 && this.possessionCooldown <= 0) {
             this.hasPossession = true;
             this.possessionTime += deltaTime;
             
-            // Magnetize ball to player when in possession
-            const toBall = ball.pos.sub(this.pos);
-            if (toBall.mag() > this.radius + 8) {
-                const pullStrength = 300 * deltaTime;
-                ball.pos = ball.pos.add(toBall.normalize().mult(-pullStrength));
-            }
-        } else if (distToBall > possessionRadius + 10) {
+            // Don't magnetize - let controller handle ball position
+        } else if (distToBall > possessionRadius + 15) {
             if (this.hasPossession) {
-                this.possessionCooldown = 0.3; // 0.3 second cooldown after losing possession
+                this.possessionCooldown = 0.2; // 0.2 second cooldown after losing possession
             }
             this.hasPossession = false;
             this.possessionTime = 0;
@@ -259,7 +254,9 @@ export class Player {
     /**
      * Default AI update behavior (preserved from original implementation)
      */
-    private defaultAIUpdate(ball: Ball, players: Player[], deltaTime: number): void {        
+    private defaultAIUpdate(ball: Ball, players: Player[], deltaTime: number): void {
+        const distToBall = this.pos.dist(ball.pos);
+        
         if (this.hasPossession) {
             this.passTimer += deltaTime;
 

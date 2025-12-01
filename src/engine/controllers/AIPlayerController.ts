@@ -55,18 +55,28 @@ export class AIPlayerController implements IPlayerController {
             return;
         }
 
+        // Check for pressure FIRST - if under pressure, pass immediately
+        const isUnderPressure = this.isUnderPressure(player, players);
+        if (isUnderPressure && this.passTimer > 10) {
+            const passSuccess = Math.random() < diffConfig.passAccuracy;
+            if (passSuccess) {
+                this.pass(player, ball, players);
+            } else {
+                this.inaccuratePass(player, ball);
+            }
+            this.passTimer = 0;
+            return;
+        }
+
         // Determine if player should shoot, pass, or dribble
         const nearGoal = this.isNearOpponentGoal(player);
         const hasShootingAngle = this.hasGoodShootingAngle(player, ball, players);
-        const isUnderPressure = this.isUnderPressure(player, players);
 
-        // Decision making based on difficulty and situation
         const shouldShoot = nearGoal && 
                            hasShootingAngle && 
                            Math.random() < diffConfig.shootingConfidence;
 
-        const shouldPass = isUnderPressure || 
-                          this.passTimer > diffConfig.dribblingTime ||
+        const shouldPass = this.passTimer > diffConfig.dribblingTime ||
                           Math.random() < (1 - diffConfig.aggressiveness) * 0.3;
 
         if (shouldShoot) {
@@ -257,25 +267,35 @@ export class AIPlayerController implements IPlayerController {
             ball.pos.x < midLine : 
             ball.pos.x > midLine;
 
+        // Check who is closest to ball
+        const closestToBall = this.getClosestPlayerToBall(player, ball, players);
+        const isClosest = closestToBall === player;
+
         let targetPos = player.startPos;
         let urgency = 1.0;
 
-        // Role-specific positioning
-        switch (player.role) {
-            case 'defender':
-                targetPos = this.getDefenderPosition(player, ball, players, ballInOwnHalf);
-                urgency = ballInOwnHalf ? 1.2 : 0.8;
-                break;
-            
-            case 'midfielder':
-                targetPos = this.getMidfielderPosition(player, ball, players);
-                urgency = 1.0;
-                break;
-            
-            case 'forward':
-                targetPos = this.getForwardPosition(player, ball, players, ballInOwnHalf);
-                urgency = ballInOwnHalf ? 0.7 : 1.1;
-                break;
+        // If ball is stationary or slow, and this player is closest, go get it
+        if (ballSpeed < 150 && isClosest && distToBall < 200) {
+            targetPos = ball.pos;
+            urgency = 1.5;
+        } else {
+            // Role-specific positioning
+            switch (player.role) {
+                case 'defender':
+                    targetPos = this.getDefenderPosition(player, ball, players, ballInOwnHalf);
+                    urgency = ballInOwnHalf ? 1.2 : 0.8;
+                    break;
+                
+                case 'midfielder':
+                    targetPos = this.getMidfielderPosition(player, ball, players);
+                    urgency = 1.0;
+                    break;
+                
+                case 'forward':
+                    targetPos = this.getForwardPosition(player, ball, players, ballInOwnHalf);
+                    urgency = ballInOwnHalf ? 0.7 : 1.1;
+                    break;
+            }
         }
 
         // Apply positioning with difficulty-based accuracy
@@ -289,6 +309,26 @@ export class AIPlayerController implements IPlayerController {
         const steer = desired.sub(player.vel.mult(0.1)).limit(player.acceleration * 0.8);
         
         player.acc = player.acc.add(steer);
+    }
+
+    /**
+     * Get closest player to ball (on same team)
+     */
+    private getClosestPlayerToBall(currentPlayer: Player, ball: Ball, players: Player[]): Player {
+        const teammates = players.filter(p => p.team === currentPlayer.team && p.role !== 'goalkeeper');
+        
+        let closest = currentPlayer;
+        let minDist = currentPlayer.pos.dist(ball.pos);
+        
+        teammates.forEach(teammate => {
+            const dist = teammate.pos.dist(ball.pos);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = teammate;
+            }
+        });
+        
+        return closest;
     }
 
     /**
@@ -424,8 +464,17 @@ export class AIPlayerController implements IPlayerController {
         const opponents = players.filter(p => p.team !== player.team);
         
         for (const opponent of opponents) {
-            if (player.pos.dist(opponent.pos) < 60) {
-                return true;
+            const dist = player.pos.dist(opponent.pos);
+            // Increased pressure radius and check if opponent is moving towards player
+            if (dist < 80) {
+                const toPlayer = player.pos.sub(opponent.pos).normalize();
+                const opponentDirection = opponent.vel.normalize();
+                const dotProduct = toPlayer.x * opponentDirection.x + toPlayer.y * opponentDirection.y;
+                
+                // If opponent is moving towards player (dot product > 0.3)
+                if (dotProduct > 0.3 || dist < 50) {
+                    return true;
+                }
             }
         }
         

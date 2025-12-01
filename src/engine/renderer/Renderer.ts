@@ -113,7 +113,7 @@ export class Renderer {
         // Goal netting
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         this.ctx.lineWidth = 1;
-        
+
         // Vertical lines
         const netSpacing = 15;
         for (let i = netSpacing; i < width; i += netSpacing) {
@@ -122,7 +122,7 @@ export class Renderer {
             this.ctx.lineTo(x + i, y + height);
             this.ctx.stroke();
         }
-        
+
         // Horizontal lines
         for (let i = netSpacing; i < height; i += netSpacing) {
             this.ctx.beginPath();
@@ -195,7 +195,7 @@ export class Renderer {
             if (player.hasPossession) {
                 const text = player.role.substring(0, 3).toUpperCase();
                 const textY = player.pos.y - player.radius - 20;
-                
+
                 this.ctx.strokeText(text, player.pos.x, textY);
                 this.ctx.fillText(text, player.pos.x, textY);
             }
@@ -214,7 +214,7 @@ export class Renderer {
         this.ctx.strokeStyle = 'rgba(255, 68, 68, 0.2)';
         this.ctx.lineWidth = 1;
         this.ctx.setLineDash([5, 5]);
-        
+
         this.drawFormationLines(homeTeam);
 
         this.ctx.strokeStyle = 'rgba(68, 68, 255, 0.2)';
@@ -266,7 +266,8 @@ export class Renderer {
             'WASD/Arrows: Move',
             'Shift: Sprint',
             'Space: Pass/Shoot (hold)',
-            'Q/Tab: Switch player'
+            'Q/Tab: Switch player',
+            'R: Reset Game'
         ];
 
         const x = 10;
@@ -281,7 +282,7 @@ export class Renderer {
         if (selectedPlayer.stamina < selectedPlayer.maxStamina) {
             const staminaText = `Stamina: ${Math.round(selectedPlayer.stamina)}%`;
             const staminaY = y + hints.length * 16 + 5;
-            
+
             this.ctx.strokeText(staminaText, x, staminaY);
             this.ctx.fillText(staminaText, x, staminaY);
         }
@@ -293,25 +294,25 @@ export class Renderer {
     render(players: Player[], ball: Ball, selectedPlayer: Player | null = null): void {
         // Clear canvas
         this.clear();
-        
+
         // Draw pitch
         this.drawPitch();
-        
+
         // Draw possession indicator
         this.drawPossessionIndicator(players);
-        
+
         // Draw tactical lines (optional - set to false by default)
         this.drawTacticalLines(players, false);
-        
+
         // Draw players
         this.drawPlayers(players, selectedPlayer);
-        
+
         // Draw ball
         this.drawBall(ball);
-        
+
         // Draw player info (only for players with possession)
         this.drawPlayerInfo(players);
-        
+
         // Draw control hints
         if (selectedPlayer) {
             this.drawControlHints(selectedPlayer);

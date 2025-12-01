@@ -18,6 +18,10 @@ export interface GameState {
     difficulty?: GameDifficulty;
 }
 
+const RATIO = 1.5;
+const WIDTH = 1200;
+
+
 /**
  * Main Game Engine - Orchestrates all game logic
  * Pure TypeScript class without React dependencies
@@ -25,8 +29,8 @@ export interface GameState {
 export class GameEngine {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
-    private canvasWidth: number = 900;
-    private canvasHeight: number = 600;
+    private canvasWidth: number = WIDTH;
+    private canvasHeight: number = WIDTH/RATIO;
 
     private ball: Ball;
     private players: Player[] = [];
@@ -100,6 +104,11 @@ export class GameEngine {
                 e.preventDefault();
                 this.switchPlayer();
             }
+
+            if(key === 'r'){
+                e.preventDefault()
+                this.resetGame()
+            }
         };
 
         this.handleKeyUp = (e: KeyboardEvent) => {
@@ -130,6 +139,40 @@ export class GameEngine {
         this.humanPlayerControllers.forEach((controller, player) => {
             controller.setSelected(player === this.selectedPlayer);
         });
+    }
+
+    /**
+     * Auto-switch to player closest to ball
+     */
+    private autoSwitchToClosest(): void {
+        if (this.humanPlayers.size === 0 || !this.selectedPlayer) return;
+
+        const humanPlayersArray = Array.from(this.humanPlayers);
+        
+        // Find closest human player to ball
+        let closest = humanPlayersArray[0];
+        let minDist = closest.pos.dist(this.ball.pos);
+
+        humanPlayersArray.forEach(player => {
+            const dist = player.pos.dist(this.ball.pos);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = player;
+            }
+        });
+
+        // Switch if the closest player is different and significantly closer
+        if (closest !== this.selectedPlayer) {
+            const currentDist = this.selectedPlayer.pos.dist(this.ball.pos);
+            if (minDist < currentDist - 80) {
+                this.selectedPlayer = closest;
+                
+                // Update all controllers
+                this.humanPlayerControllers.forEach((controller, player) => {
+                    controller.setSelected(player === this.selectedPlayer);
+                });
+            }
+        }
     }
     
     /**
@@ -381,6 +424,11 @@ export class GameEngine {
                     this.ball.reset();
                 }
             } else {
+                // Auto-switch to closest player when ball moves significantly (every 30 frames)
+                if (this.humanPlayers.size > 0 && Math.floor(currentTime / 16.67) % 30 === 0) {
+                    this.autoSwitchToClosest();
+                }
+
                 // Update keyboard input for human players
                 this.humanPlayerControllers.forEach((controller) => {
                     controller.handleInput(this.pressedKeys);

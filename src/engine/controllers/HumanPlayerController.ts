@@ -23,6 +23,16 @@ export class HumanPlayerController implements IPlayerController {
     }
 
     update(player: Player, ball: Ball, players: Player[]): void {
+        // Auto-switch to nearest player when ball changes significantly
+        if (this.isSelected) {
+            const distToBall = player.pos.dist(ball.pos);
+            
+            // If ball is far and moving fast, consider auto-switching
+            if (distToBall > 150 && ball.vel.mag() > 200) {
+                this.checkAutoSwitch(player, ball, players);
+            }
+        }
+
         // Only control the selected player
         if (!this.isSelected) {
             // Non-selected players use simple AI positioning
@@ -41,6 +51,37 @@ export class HumanPlayerController implements IPlayerController {
 
         // Handle ball control when close to ball
         this.handleBallControl(player, ball);
+    }
+
+    /**
+     * Check if we should auto-switch to a closer player
+     */
+    private checkAutoSwitch(currentPlayer: Player, ball: Ball, players: Player[]): void {
+        // Find all human-controlled players on same team
+        const teammates = players.filter(p => 
+            p.team === currentPlayer.team && 
+            p !== currentPlayer &&
+            p.role !== 'goalkeeper'
+        );
+
+        // Find closest teammate to ball
+        let closestTeammate: Player | null = null;
+        let minDist = Infinity;
+
+        teammates.forEach(teammate => {
+            const dist = teammate.pos.dist(ball.pos);
+            if (dist < minDist) {
+                minDist = dist;
+                closestTeammate = teammate;
+            }
+        });
+
+        // If closest teammate is significantly closer (more than 100 pixels), suggest switch
+        const currentDist = currentPlayer.pos.dist(ball.pos);
+        if (closestTeammate && minDist < currentDist - 100) {
+            // This will be handled by the game engine's player switching
+            // The current implementation allows manual switching with Q/Tab
+        }
     }
 
     /**

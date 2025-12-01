@@ -76,15 +76,16 @@ export class Ball {
         const goalTop = this.canvasHeight / 2 - this.GOAL_TOP_OFFSET;
         const goalBottom = this.canvasHeight / 2 + this.GOAL_BOTTOM_OFFSET;
 
-        // Check if ball is within goal height range
-        if (this.pos.y >= goalTop && this.pos.y <= goalBottom) {
+        // Check if ball is within goal height range (add radius for better detection)
+        if (this.pos.y >= goalTop - this.radius && this.pos.y <= goalBottom + this.radius) {
             // Left goal (home side) - Away team scores
-            if (this.pos.x <= this.GOAL_LINE_LEFT) {
+            // Ball center must cross the goal line
+            if (this.pos.x <= this.GOAL_LINE_LEFT + this.radius) {
                 return { goalScored: true, scoredBy: 'away' };
             }
             
             // Right goal (away side) - Home team scores
-            if (this.pos.x >= this.canvasWidth - this.GOAL_LINE_RIGHT_OFFSET) {
+            if (this.pos.x >= this.canvasWidth - this.GOAL_LINE_RIGHT_OFFSET - this.radius) {
                 return { goalScored: true, scoredBy: 'home' };
             }
         }
@@ -99,15 +100,25 @@ export class Ball {
         const padding = 50; // Pitch boundary padding
         const dampening = 0.6; // Energy loss on bounce
 
-        // Left and right boundaries
+        // Left and right boundaries (but not goal areas)
+        const goalTop = this.canvasHeight / 2 - this.GOAL_TOP_OFFSET;
+        const goalBottom = this.canvasHeight / 2 + this.GOAL_BOTTOM_OFFSET;
+        const isInGoalHeight = this.pos.y >= goalTop && this.pos.y <= goalBottom;
+
         if (this.pos.x - this.radius < padding) {
-            this.pos.x = padding + this.radius;
-            this.vel.x *= -dampening;
-            this.spin *= 0.7; // Reduce spin on wall bounce
+            // Don't bounce if it's going into the goal
+            if (!isInGoalHeight || this.pos.x > this.GOAL_LINE_LEFT) {
+                this.pos.x = padding + this.radius;
+                this.vel.x *= -dampening;
+                this.spin *= 0.7;
+            }
         } else if (this.pos.x + this.radius > this.canvasWidth - padding) {
-            this.pos.x = this.canvasWidth - padding - this.radius;
-            this.vel.x *= -dampening;
-            this.spin *= 0.7;
+            // Don't bounce if it's going into the goal
+            if (!isInGoalHeight || this.pos.x < this.canvasWidth - this.GOAL_LINE_RIGHT_OFFSET) {
+                this.pos.x = this.canvasWidth - padding - this.radius;
+                this.vel.x *= -dampening;
+                this.spin *= 0.7;
+            }
         }
 
         // Top and bottom boundaries
