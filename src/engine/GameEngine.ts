@@ -57,8 +57,6 @@ export class GameEngine {
     // Delta time for frame-independent movement
     private lastFrameTime: number = 0;
     private deltaTime: number = 0;
-    private targetFPS: number = 60;
-    private frameTime: number = 1000 / this.targetFPS;
     
     // Goal celebration pause
     private goalCelebrationTime: number = 0;

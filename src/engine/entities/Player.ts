@@ -255,7 +255,6 @@ export class Player {
      * Default AI update behavior (preserved from original implementation)
      */
     private defaultAIUpdate(ball: Ball, players: Player[], deltaTime: number): void {
-        const distToBall = this.pos.dist(ball.pos);
         
         if (this.hasPossession) {
             this.passTimer += deltaTime;
